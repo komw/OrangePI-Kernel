@@ -525,7 +525,7 @@ static struct crypto_alg twofish_algs[10] = { {
 }, {
 	.cra_name		= "ecb(twofish)",
 	.cra_driver_name	= "ecb-twofish-neon",
-	.cra_priority		= 300,
+	.cra_priority		= 250,
 	.cra_flags		= CRYPTO_ALG_TYPE_ABLKCIPHER | CRYPTO_ALG_ASYNC,
 	.cra_blocksize		= TF_BLOCK_SIZE,
 	.cra_ctxsize		= sizeof(struct async_helper_ctx),
@@ -546,7 +546,7 @@ static struct crypto_alg twofish_algs[10] = { {
 }, {
 	.cra_name		= "cbc(twofish)",
 	.cra_driver_name	= "cbc-twofish-neon",
-	.cra_priority		= 300,
+	.cra_priority		= 250,
 	.cra_flags		= CRYPTO_ALG_TYPE_ABLKCIPHER | CRYPTO_ALG_ASYNC,
 	.cra_blocksize		= TF_BLOCK_SIZE,
 	.cra_ctxsize		= sizeof(struct async_helper_ctx),
@@ -568,7 +568,7 @@ static struct crypto_alg twofish_algs[10] = { {
 }, {
 	.cra_name		= "ctr(twofish)",
 	.cra_driver_name	= "ctr-twofish-neon",
-	.cra_priority		= 300,
+	.cra_priority		= 250,
 	.cra_flags		= CRYPTO_ALG_TYPE_ABLKCIPHER | CRYPTO_ALG_ASYNC,
 	.cra_blocksize		= 1,
 	.cra_ctxsize		= sizeof(struct async_helper_ctx),
@@ -591,7 +591,7 @@ static struct crypto_alg twofish_algs[10] = { {
 }, {
 	.cra_name		= "lrw(twofish)",
 	.cra_driver_name	= "lrw-twofish-neon",
-	.cra_priority		= 300,
+	.cra_priority		= 250,
 	.cra_flags		= CRYPTO_ALG_TYPE_ABLKCIPHER | CRYPTO_ALG_ASYNC,
 	.cra_blocksize		= TF_BLOCK_SIZE,
 	.cra_ctxsize		= sizeof(struct async_helper_ctx),
@@ -615,7 +615,7 @@ static struct crypto_alg twofish_algs[10] = { {
 }, {
 	.cra_name		= "xts(twofish)",
 	.cra_driver_name	= "xts-twofish-neon",
-	.cra_priority		= 300,
+	.cra_priority		= 250,
 	.cra_flags		= CRYPTO_ALG_TYPE_ABLKCIPHER | CRYPTO_ALG_ASYNC,
 	.cra_blocksize		= TF_BLOCK_SIZE,
 	.cra_ctxsize		= sizeof(struct async_helper_ctx),
