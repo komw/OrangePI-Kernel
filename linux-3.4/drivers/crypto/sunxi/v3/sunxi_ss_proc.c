@@ -101,7 +101,7 @@ static int ss_sg_config(ce_scatter_t *scatter, ss_dma_info_t *info, int type, in
 			WARN(1, "Too many scatter: %d\n", cnt);
 			return -1;
 		}
-		
+
 		scatter[cnt].addr = sg_dma_address(cur);
 		scatter[cnt].len = sg_dma_len(cur)/4;
 		info->last_sg = cur;
@@ -262,7 +262,7 @@ static int ss_aes_start(ss_aes_ctx_t *ctx, ss_aes_req_ctx_t *req_ctx, int len)
 
 	ss_pending_clear(flow);
 	ss_irq_enable(flow);
-	
+
 	ss_method_set(req_ctx->dir, req_ctx->type, task);
 	if ((req_ctx->type == SS_METHOD_RSA) || (req_ctx->type == SS_METHOD_DH)) {
 		if (req_ctx->mode == CE_RSA_OP_M_MUL)
@@ -303,7 +303,7 @@ static int ss_aes_start(ss_aes_ctx_t *ctx, ss_aes_req_ctx_t *req_ctx, int len)
 		ss_cnt_set(ctx->next_iv, ctx->iv_size, task);
 		dma_map_single(&ss_dev->pdev->dev, ctx->next_iv, ctx->iv_size, DMA_DEV_TO_MEM);
 	}
-	
+
 	align_size = ss_aes_align_size(req_ctx->type, req_ctx->mode);
 
 	/* Prepare the src scatterlist */
@@ -329,9 +329,11 @@ static int ss_aes_start(ss_aes_ctx_t *ctx, ss_aes_req_ctx_t *req_ctx, int len)
 	else
 		ss_data_len_set(DIV_ROUND_UP(src_len, align_size)*align_size/4, task);
 
+	SS_DBG("src_nents = %d, dst_nents = %d\n", req_ctx->dma_src.nents, req_ctx->dma_dst.nents);
+
 	/* Start CE controller. */
 	init_completion(&ss_dev->flows[flow].done);
-	dma_map_single(&ss_dev->pdev->dev, task, sizeof(ce_task_desc_t), DMA_MEM_TO_DEV);	
+	dma_map_single(&ss_dev->pdev->dev, task, sizeof(ce_task_desc_t), DMA_MEM_TO_DEV);
 
 	SS_DBG("Before CE, COMM: 0x%08x, SYM: 0x%08x, ASYM: 0x%08x\n", task->comm_ctl, task->sym_ctl, task->asym_ctl);
 	ss_ctrl_start(task);
@@ -655,7 +657,12 @@ void ss_load_iv(ss_aes_ctx_t *ctx, ss_aes_req_ctx_t *req_ctx, char *buf, int siz
 int ss_aes_one_req(sunxi_ss_t *sss, struct ablkcipher_request *req)
 {
 	int ret = 0;
+	char *src_buf = NULL;
+	char *dst_buf = NULL;
+	int src_nents, dst_nents;
 	struct crypto_ablkcipher *tfm = NULL;
+	struct scatterlist src_sg = {0};
+	struct scatterlist dst_sg = {0};
 	ss_aes_ctx_t *ctx = NULL;
 	ss_aes_req_ctx_t *req_ctx = NULL;
 
@@ -663,6 +670,32 @@ int ss_aes_one_req(sunxi_ss_t *sss, struct ablkcipher_request *req)
 	if (!req->src || !req->dst) {
 		SS_ERR("Invalid sg: src = %p, dst = %p\n", req->src, req->dst);
 		return -EINVAL;
+	}
+
+	src_nents = ss_sg_cnt(req->src, req->nbytes);
+	dst_nents = ss_sg_cnt(req->dst, req->nbytes);
+
+	SS_DBG("src_nents = %d, dst_nents = %d\n", src_nents, dst_nents);
+
+	if (src_nents > CE_SCATTERS_PER_TASK) {
+		src_buf = kmalloc(req->nbytes, GFP_KERNEL);
+		if (src_buf == NULL) {
+			SS_ERR("Failed to kmalloc(%d)! \n", req->nbytes);
+			return -ENOMEM;
+		}
+
+		sg_copy_to_buffer(req->src, src_nents, src_buf, req->nbytes);
+		sg_init_one(&src_sg, src_buf, req->nbytes);
+	}
+
+	if (dst_nents > CE_SCATTERS_PER_TASK) {
+		dst_buf = kzalloc(req->nbytes, GFP_KERNEL);
+		if (dst_buf == NULL) {
+			SS_ERR("Failed to kzalloc(%d)! \n", req->nbytes);
+			return -ENOMEM;
+		}
+
+		sg_init_one(&dst_sg, dst_buf, req->nbytes);
 	}
 
 	ss_dev_lock();
@@ -676,6 +709,12 @@ int ss_aes_one_req(sunxi_ss_t *sss, struct ablkcipher_request *req)
 	req_ctx->dma_src.sg = req->src;
 	req_ctx->dma_dst.sg = req->dst;
 
+	if (src_nents > CE_SCATTERS_PER_TASK)
+		req_ctx->dma_src.sg = &src_sg;
+
+	if (dst_nents > CE_SCATTERS_PER_TASK)
+		req_ctx->dma_dst.sg = &dst_sg;
+
 #ifdef SS_RSA_PREPROCESS_ENABLE
 	ss_rsa_preprocess(ctx, req_ctx, req->nbytes);
 #endif
@@ -685,6 +724,9 @@ int ss_aes_one_req(sunxi_ss_t *sss, struct ablkcipher_request *req)
 		SS_ERR("ss_aes_start fail(%d)\n", ret);
 
 	ss_dev_unlock();
+
+	if (dst_nents > CE_SCATTERS_PER_TASK)
+		sg_copy_from_buffer(req->dst, dst_nents, dst_buf, req->nbytes);
 
 #ifdef SS_CTR_MODE_ENABLE
 	if (req_ctx->mode == SS_AES_MODE_CTR) {
@@ -696,6 +738,12 @@ int ss_aes_one_req(sunxi_ss_t *sss, struct ablkcipher_request *req)
 	ctx->cnt += req->nbytes;
 	if (req->base.complete)
 		req->base.complete(&req->base, ret);
+
+	if (src_buf)
+		kfree(src_buf);
+
+	if (dst_buf)
+		kfree(dst_buf);
 
 	return ret;
 }
