@@ -329,7 +329,7 @@ static int ss_aes_start(ss_aes_ctx_t *ctx, ss_aes_req_ctx_t *req_ctx, int len)
 	else
 		ss_data_len_set(DIV_ROUND_UP(src_len, align_size)*align_size/4, task);
 
-	SS_DBG("src_nents = %d, dst_nents = %d\n", req_ctx->dma_src.nents, req_ctx->dma_dst.nents);
+	SS_DBG("src_nents = %d, dst_nents = %d, len = %d\n", req_ctx->dma_src.nents, req_ctx->dma_dst.nents, src_len);
 
 	/* Start CE controller. */
 	init_completion(&ss_dev->flows[flow].done);
@@ -675,7 +675,7 @@ int ss_aes_one_req(sunxi_ss_t *sss, struct ablkcipher_request *req)
 	src_nents = ss_sg_cnt(req->src, req->nbytes);
 	dst_nents = ss_sg_cnt(req->dst, req->nbytes);
 
-	SS_DBG("src_nents = %d, dst_nents = %d\n", src_nents, dst_nents);
+	SS_DBG("src_nents = %d, dst_nents = %d, len = %d\n", src_nents, dst_nents, req->nbytes);
 
 	if (src_nents > CE_SCATTERS_PER_TASK) {
 		src_buf = kmalloc(req->nbytes, GFP_KERNEL);
@@ -739,11 +739,15 @@ int ss_aes_one_req(sunxi_ss_t *sss, struct ablkcipher_request *req)
 	if (req->base.complete)
 		req->base.complete(&req->base, ret);
 
-	if (src_buf)
+	if (src_buf) {
+		memset(src_buf, 0, req->nbytes);
 		kfree(src_buf);
+	}
 
-	if (dst_buf)
+	if (dst_buf) {
+		memset(dst_buf, 0, req->nbytes);
 		kfree(dst_buf);
+	}
 
 	return ret;
 }

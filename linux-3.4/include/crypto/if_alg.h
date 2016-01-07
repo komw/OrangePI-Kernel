@@ -20,7 +20,12 @@
 #include <linux/types.h>
 #include <net/sock.h>
 
+/* Maximum scatters per task is 8 in some sunxi architectures */
+#if defined(CONFIG_ARCH_SUN8IW7) || defined(CONFIG_ARCH_SUN8IW9)
+#define ALG_MAX_PAGES			8
+#else
 #define ALG_MAX_PAGES			16
+#endif
 
 struct crypto_async_request;
 
